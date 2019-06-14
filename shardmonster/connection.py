@@ -47,8 +47,8 @@ def configure_controller(*args, **kwargs):
     _controlling_db_config = (args, kwargs)
 
 
-def _make_connection(cluster_name):
-    uri = get_cluster_uri(cluster_name)
+def _make_connection(cluster_name, local_mongos):
+    uri = get_cluster_uri(cluster_name, local_mongos)
     return _connect_to_mongo(uri)
 
 
@@ -66,11 +66,11 @@ def get_controlling_db():
     return _controlling_db
 
 
-def get_connection(cluster_name):
+def get_connection(cluster_name, local_mongos):
     global _connection_cache
     key = '%s:%s' % (threading.current_thread(), cluster_name)
     if key not in _connection_cache:
-        connection = _make_connection(cluster_name)
+        connection = _make_connection(cluster_name, local_mongos)
         _connection_cache[key] = connection
         return connection
 
@@ -125,13 +125,15 @@ def ensure_cluster_exists(name, uri):
             )
 
 
-def get_cluster_uri(name):
+def get_cluster_uri(name, local_mongos):
     """Gets the URI of the cluster with the given name.
 
     Caches all lookups for ~10 minutes.
     """
     global _cluster_uri_cache
     now = time.time()
+    if name == 'monogs' and local_mongos:
+        return local_mongos
     if name not in _cluster_uri_cache or _cluster_uri_cache[name][1] <= now:
         coll = _get_cluster_coll()
         cluster = coll.find_one({'name': name})

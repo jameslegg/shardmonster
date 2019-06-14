@@ -164,39 +164,49 @@ def _reset_sharding_info():
 
 
 class ShardAwareCollectionProxy(object):
-    def __init__(self, collection_name):
+    def __init__(self, collection_name, local_mongos=None):
         self.collection_name = collection_name
+        self.local_mongos = local_mongos
         self._with_options = {}
 
     def find(self, *args, **kwargs):
         return operations.multishard_find(
             self.collection_name,
-            with_options=self._with_options, *args, **kwargs)
+            with_options=self._with_options, *args,
+            local_mongos=self.local_mongos, **kwargs)
 
     def find_one(self, *args, **kwargs):
         return operations.multishard_find_one(
             self.collection_name,
-            with_options=self._with_options, *args, **kwargs)
+            self.local_mongos,
+            with_options=self._with_options, *args,
+            local_mongos=self.local_mongos, **kwargs)
 
     def update(self, *args, **kwargs):
         return operations.multishard_update(
             self.collection_name,
-            with_options=self._with_options, *args, **kwargs)
+            self.local_mongos,
+            with_options=self._with_options, *args,
+            local_mongos=self.local_mongos, **kwargs)
 
     def insert(self, *args, **kwargs):
         return operations.multishard_insert(
             self.collection_name,
-            with_options=self._with_options, *args, **kwargs)
+            self.local_mongos,
+            with_options=self._with_options, *args,
+            local_mongos=self.local_mongos, **kwargs)
 
     def remove(self, *args, **kwargs):
         return operations.multishard_remove(
             self.collection_name,
-            with_options=self._with_options, *args, **kwargs)
+            with_options=self._with_options, *args,
+            local_mongos=self.local_mongos, **kwargs)
 
     def save(self, *args, **kwargs):
         return operations.multishard_save(
             self.collection_name,
-            with_options=self._with_options, *args, **kwargs)
+            with_options=self._with_options, *args,
+            local_mongos=self.local_mongos, **kwargs)
 
     def with_options(self, **kwargs):
         new_collection = ShardAwareCollectionProxy(self.collection_name)
@@ -207,11 +217,13 @@ class ShardAwareCollectionProxy(object):
     def ensure_index(self, *args, **kwargs):
         # !!!! ensure_index deprecated
         return operations.multishard_ensure_index(
-            self.collection_name, *args, **kwargs)
+            self.collection_name, *args,
+            local_mongos=self.local_mongos, **kwargs)
 
     def create_index(self, *args, **kwargs):
         return operations.multishard_create_index(
-            self.collection_name, *args, **kwargs)
+            self.collection_name, *args,
+            local_mongos=self.local_mongos, **kwargs)
 
     def aggregate(self, *args, **kwargs):
         return operations.multishard_aggregate(
@@ -221,11 +233,13 @@ class ShardAwareCollectionProxy(object):
     def find_and_modify(self, *args, **kwargs):
         # !!!! find_and_modify deprecated
         return operations.multishard_find_and_modify(
-            self.collection_name, *args, **kwargs)
+            self.collection_name, *args,
+            local_mongos=self.local_mongos, **kwargs)
 
     def find_one_and_update(self, *args, **kwargs):
         return operations.multishard_find_one_and_update(
-            self.collection_name, *args, **kwargs)
+            self.collection_name, *args,
+            local_mongos=self.local_mongos, **kwargs)
 
 def make_collection_shard_aware(collection_name):
     """Returns a new object that proxies the given collection and makes it

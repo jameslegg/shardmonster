@@ -28,7 +28,8 @@ def _get_value_by_key(d, key):
 
 
 def _create_collection_iterator(collection_name, query, with_options={},
-                                log_untargetted_queries=True):
+                                log_untargetted_queries=True,
+                                local_mongos=None):
     """Creates an iterator that returns collections and queries that can then
     be used to perform multishard operations:
 
@@ -54,7 +55,7 @@ def _create_collection_iterator(collection_name, query, with_options={},
 
     for location, location_meta in locations.iteritems():
         cluster_name, database_name = parse_location(location)
-        connection = get_connection(cluster_name)
+        connection = get_connection(cluster_name, local_mongos)
         collection = connection[database_name][collection_name]
         if with_options:
             collection = collection.with_options(**with_options)
@@ -84,7 +85,8 @@ class MultishardCursor(object):
 
     def _create_collection_iterator(self):
         return _create_collection_iterator(
-            self.collection_name, self.query, self.with_options)
+            self.collection_name, self.query, self.with_options,
+            local_mongos=self.kwargs.get('local_mongos'))
 
     def _prepare_for_iteration(self):
         # The multishard cursor has to keep track of a surprising amount of
@@ -304,6 +306,7 @@ def multishard_find_one(collection_name, query, **kwargs):
 
 def multishard_insert(
         collection_name, doc_or_docs, with_options={}, *args, **kwargs):
+    local_mongos = kwargs.get('local_mongos')
     # TODO Remove this and use insert_one/insert_many to comply with new
     # pymongo deprecations
     is_multi_insert = isinstance(doc_or_docs, list)
@@ -329,7 +332,8 @@ def multishard_insert(
     for doc in all_docs:
         simple_query = {shard_field: doc[shard_field]}
         (collection, _, _), = _create_collection_iterator(
-            collection_name, simple_query, with_options)
+            collection_name, simple_query, with_options,
+            local_mongos=local_mongos)
         result.append(collection.insert(doc, *args, **kwargs))
     if not is_multi_insert:
         return result[0]
@@ -375,7 +379,7 @@ def _wait_for_pause_to_end(collection_name, query):
 
 
 def _get_collection_for_targetted_upsert(
-        collection_name, query, update, with_options={}):
+        collection_name, query, update, with_options={}, local_mongos=None):
     shard_key = _get_query_target(collection_name, update)
     if not shard_key:
         shard_key = _get_query_target(collection_name, update['$set'])
@@ -383,7 +387,7 @@ def _get_collection_for_targetted_upsert(
     location = _get_location_for_shard(realm, shard_key)
 
     cluster_name, database_name = parse_location(location.location)
-    connection = get_connection(cluster_name)
+    connection = get_connection(cluster_name, local_mongos)
     collection = connection[database_name][collection_name]
     if with_options:
         collection = collection.with_options(with_options)
@@ -392,6 +396,7 @@ def _get_collection_for_targetted_upsert(
 
 def multishard_update(collection_name, query, update,
                       with_options={}, **kwargs):
+    local_mongos = kwargs.get('local_mongos')
     _wait_for_pause_to_end(collection_name, query)
     overall_result = None
     # If this is an upsert then we check the update to see if it might contain
@@ -405,7 +410,8 @@ def multishard_update(collection_name, query, update,
         # wrong query. Instead, get a specific collection and turn it into the
         # right format.
         collection = _get_collection_for_targetted_upsert(
-            collection_name, query, update, with_options)
+            collection_name, query, update, with_options,
+            local_mongos=local_mongos)
         collection_iterator = [(collection, query, None)]
 
     if (kwargs.get('upsert', False) and
@@ -413,12 +419,14 @@ def multishard_update(collection_name, query, update,
         # As above, but the update is a replace so is not contained within the
         # $set of the update
         collection = _get_collection_for_targetted_upsert(
-            collection_name, query, update, with_options)
+            collection_name, query, update, with_options,
+            local_mongos=local_mongos)
         collection_iterator = [(collection, query, None)]
 
     if not collection_iterator:
         collection_iterator = _create_collection_iterator(
-            collection_name, query, with_options)
+            collection_name, query, with_options,
+            local_mongos=local_mongos)
 
     for collection, targetted_query, _ in collection_iterator:
         result = collection.update(targetted_query, update, **kwargs)
@@ -431,10 +439,12 @@ def multishard_update(collection_name, query, update,
 
 
 def multishard_remove(collection_name, query, with_options={}, **kwargs):
+    local_mongos = kwargs.get('local_mongos')
     _wait_for_pause_to_end(collection_name, query)
     overall_result = None
     collection_iterator = _create_collection_iterator(
-        collection_name, query, with_options)
+        collection_name, query, with_options,
+        local_mongos=local_mongos)
     for collection, targetted_query, _ in collection_iterator:
         result = collection.remove(targetted_query, **kwargs)
         if not overall_result:
@@ -447,6 +457,7 @@ def multishard_remove(collection_name, query, with_options={}, **kwargs):
 
 def multishard_aggregate(
         collection_name, pipeline, with_options={}, *args, **kwargs):
+    local_mongos = kwargs.get('local_mongos')
     realm = _get_realm_for_collection(collection_name)
     shard_field = realm['shard_field']
     if '$match' not in pipeline[0]:
@@ -461,13 +472,15 @@ def multishard_aggregate(
     # aggregation to only one cluster.
     match_query = pipeline[0]['$match']
     (collection, _, _), = _create_collection_iterator(
-        collection_name, match_query, with_options)
+        collection_name, match_query, with_options,
+        local_mongos=local_mongos)
 
     # TODO: useCursor needs to be False until support for Mongo2.4 is removed
     return collection.aggregate(pipeline, useCursor=False, *args, **kwargs)
 
 
 def multishard_save(collection_name, doc, with_options={}, *args, **kwargs):
+    local_mongos = kwargs.get('local_mongos')
     _wait_for_pause_to_end(collection_name, doc)
     realm = _get_realm_for_collection(collection_name)
     shard_field = realm['shard_field']
@@ -480,29 +493,35 @@ def multishard_save(collection_name, doc, with_options={}, *args, **kwargs):
     # that is guaranteed to return exactly one collection.
     simple_query = {shard_field: doc[shard_field]}
     (collection, _, _), = _create_collection_iterator(
-        collection_name, simple_query, with_options)
+        collection_name, simple_query, with_options,
+        local_mongos=local_mongos)
 
     return collection.save(doc, *args, **kwargs)
 
 
 def multishard_ensure_index(collection_name, *args, **kwargs):
+    local_mongos = kwargs.get('local_mongos')
     # !!!! ensure_index deprecated
     collection_iterator = _create_collection_iterator(
-        collection_name, {}, log_untargetted_queries=False)
+        collection_name, {}, log_untargetted_queries=False,
+        local_mongos=local_mongos)
 
     for collection, _, _ in collection_iterator:
         collection.ensure_index(*args, **kwargs)
 
 
 def multishard_create_index(collection_name, *args, **kwargs):
+    local_mongos = kwargs.get('local_mongos')
     collection_iterator = _create_collection_iterator(
-        collection_name, {}, log_untargetted_queries=False)
+        collection_name, {}, log_untargetted_queries=False,
+        local_mongos=local_mongos)
 
     for collection, _, _ in collection_iterator:
         collection.create_index(*args, **kwargs)
 
 
 def multishard_find_and_modify(collection_name, query, update, **kwargs):
+    local_mongos = kwargs.get('local_mongos')
     # !!!! find_and_modify deprecated
     _wait_for_pause_to_end(collection_name, query)
 
@@ -517,11 +536,12 @@ def multishard_find_and_modify(collection_name, query, update, **kwargs):
     # vaguely sane we enforce that this has to target a single shard and
     # so we make use of the targetted upsert infrastructure to support this.
     collection = _get_collection_for_targetted_upsert(
-            collection_name, query, {'$set': query})
+            collection_name, query, {'$set': query}, local_mongos=local_mongos)
     return collection.find_and_modify(query, update, **kwargs)
 
 
 def multishard_find_one_and_update(collection_name, query, update, **kwargs):
+    local_mongos = kwargs.get('local_mongos')
     _wait_for_pause_to_end(collection_name, query)
 
     realm = _get_realm_for_collection(collection_name)
@@ -535,5 +555,5 @@ def multishard_find_one_and_update(collection_name, query, update, **kwargs):
     # vaguely sane we enforce that this has to target a single shard and
     # so we make use of the targetted upsert infrastructure to support this.
     collection = _get_collection_for_targetted_upsert(
-            collection_name, query, {'$set': query})
+            collection_name, query, {'$set': query}, local_mongos)
     return collection.find_one_and_update(query, update, **kwargs)
