@@ -1,12 +1,25 @@
 controller:
   hostname: controller
-  image: mongo:3.0
-  command: --smallfiles --replSet cluster-1
+  image: mongo:3.4
+  command: --smallfiles --replSet controller-1
 
 replica:
   hostname: replica
-  image: mongo:2.4
-  command: --smallfiles --replSet cluster-2
+  image: mongo:3.6
+  command: --shardsvr --replSet replica-1
+
+config:
+  hostname: config
+  image: mongo:3.6
+  command: --configsvr --replSet config-1
+
+mongos:
+  hostname: mongos
+  image: mongo:3.6
+  entrypoint: mongos --configdb config-1/replica
+  links:
+    - config
+    - replica
 
 test:
   build: .
@@ -15,3 +28,5 @@ test:
   links:
     - controller
     - replica
+    - config
+    - mongos
