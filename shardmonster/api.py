@@ -178,21 +178,18 @@ class ShardAwareCollectionProxy(object):
     def find_one(self, *args, **kwargs):
         return operations.multishard_find_one(
             self.collection_name,
-            self.local_mongos,
             with_options=self._with_options, *args,
             local_mongos=self.local_mongos, **kwargs)
 
     def update(self, *args, **kwargs):
         return operations.multishard_update(
             self.collection_name,
-            self.local_mongos,
             with_options=self._with_options, *args,
             local_mongos=self.local_mongos, **kwargs)
 
     def insert(self, *args, **kwargs):
         return operations.multishard_insert(
             self.collection_name,
-            self.local_mongos,
             with_options=self._with_options, *args,
             local_mongos=self.local_mongos, **kwargs)
 

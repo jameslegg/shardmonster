@@ -306,7 +306,8 @@ def multishard_find_one(collection_name, query, **kwargs):
 
 def multishard_insert(
         collection_name, doc_or_docs, with_options={}, *args, **kwargs):
-    local_mongos = kwargs.get('local_mongos')
+    # Pop so not as to pass local_mongos as an arg to pymongo
+    local_mongos = kwargs.pop('local_mongos', None)
     # TODO Remove this and use insert_one/insert_many to comply with new
     # pymongo deprecations
     is_multi_insert = isinstance(doc_or_docs, list)
@@ -396,7 +397,7 @@ def _get_collection_for_targetted_upsert(
 
 def multishard_update(collection_name, query, update,
                       with_options={}, **kwargs):
-    local_mongos = kwargs.get('local_mongos')
+    local_mongos = kwargs.pop('local_mongos', None)
     _wait_for_pause_to_end(collection_name, query)
     overall_result = None
     # If this is an upsert then we check the update to see if it might contain
@@ -439,7 +440,7 @@ def multishard_update(collection_name, query, update,
 
 
 def multishard_remove(collection_name, query, with_options={}, **kwargs):
-    local_mongos = kwargs.get('local_mongos')
+    local_mongos = kwargs.pop('local_mongos', None)
     _wait_for_pause_to_end(collection_name, query)
     overall_result = None
     collection_iterator = _create_collection_iterator(
@@ -457,7 +458,7 @@ def multishard_remove(collection_name, query, with_options={}, **kwargs):
 
 def multishard_aggregate(
         collection_name, pipeline, with_options={}, *args, **kwargs):
-    local_mongos = kwargs.get('local_mongos')
+    local_mongos = kwargs.pop('local_mongos', None)
     realm = _get_realm_for_collection(collection_name)
     shard_field = realm['shard_field']
     if '$match' not in pipeline[0]:

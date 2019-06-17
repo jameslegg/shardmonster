@@ -66,7 +66,7 @@ def get_controlling_db():
     return _controlling_db
 
 
-def get_connection(cluster_name, local_mongos):
+def get_connection(cluster_name, local_mongos=None):
     global _connection_cache
     key = '%s:%s' % (threading.current_thread(), cluster_name)
     if key not in _connection_cache:
@@ -125,7 +125,7 @@ def ensure_cluster_exists(name, uri):
             )
 
 
-def get_cluster_uri(name, local_mongos):
+def get_cluster_uri(name, local_mongos=None):
     """Gets the URI of the cluster with the given name.
 
     Caches all lookups for ~10 minutes.
