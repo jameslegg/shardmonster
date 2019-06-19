@@ -1,32 +1,54 @@
-controller:
-  hostname: controller
-  image: mongo:3.4
-  command: --smallfiles --replSet controller-1
+version: '3.5'
 
-replica:
-  hostname: replica
-  image: mongo:3.6
-  command: --shardsvr --replSet replica-1
+services:
+  controller:
+    hostname: controller
+    image: mongo:3.4
+    command: --smallfiles --replSet controller-1
 
-config:
-  hostname: config
-  image: mongo:3.6
-  command: --configsvr --replSet config-1
+  replica:
+    hostname: replica
+    image: mongo:3.6
+    command: --shardsvr --replSet replica-1
+    expose:
+      - "27018"
 
-mongos:
-  hostname: mongos
-  image: mongo:3.6
-  entrypoint: mongos --configdb config-1/replica
-  links:
-    - config
-    - replica
+  config:
+    hostname: config
+    image: mongo:3.6
+    command: --configsvr --replSet config-1
+    expose:
+      - "27019"
 
-test:
-  build: .
-  volumes:
-    - .:/shardmonster
-  links:
-    - controller
-    - replica
-    - config
-    - mongos
+  mongo_rs_init:
+    depends_on:
+      - replica
+      - config
+    hostname: rsinit
+    image: mongo:3.6
+    # Only *needed* on first launch of the test suite
+    # but should be harmless if ReplicaSets already initiated
+    volumes:
+      - ./test-mongo-init.sh:/test-mongo-init.sh
+    entrypoint:
+     - /test-mongo-init.sh
+
+  mongos:
+    hostname: mongos
+    image: mongo:3.6
+    entrypoint: mongos --bind_ip_all --configdb config-1/config:27019
+    links:
+      - config
+      - replica
+    expose:
+      - "27017"
+
+  test:
+    build: .
+    volumes:
+      - .:/shardmonster
+    links:
+      - controller
+      - replica
+      - config
+      - mongos

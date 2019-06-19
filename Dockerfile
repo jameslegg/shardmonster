@@ -1,5 +1,5 @@
-FROM    ubuntu:14.04
-MAINTAINER  William Cooke "will@conversocial.com"
+FROM    ubuntu:18.04
+MAINTAINER  James Legg
 
 RUN export DEBIAN_FRONTEND=noninteractive && \
 apt-get update && \

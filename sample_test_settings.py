@@ -1,13 +1,13 @@
 CONN1 = {
-    'uri': 'mongodb://controller:27017/?replicaSet=cluster-1',
+    'uri': 'mongodb://controller:27017/?replicaSet=controller-1',
     'db_name': 'test_sharding'
 }
 CONN2 = {
-    'uri': 'mongodb://replica:27017/?replicaSet=cluster-2',
+    'uri': 'mongodb://mongos:27017/',
     'db_name': 'test_sharding'
 }
 CONTROLLER = {
-    'uri': 'mongodb://controller:27017/?replicaSet=cluster-1',
+    'uri': 'mongodb://controller:27017/?replicaSet=controller-1',
     'db_name': 'test_metadata'
 }
 
