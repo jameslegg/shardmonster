@@ -68,6 +68,7 @@ class ShardingTestCase(unittest.TestCase):
         self.db1.client.drop_database(self.db1.name)
         self.db2.client.drop_database(self.db2.name)
         api._reset_sharding_info()
+        pass
 
     def _prepare_clusters(self):
         api.add_cluster('dest1', test_settings.CONN1['uri'])
